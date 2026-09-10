@@ -1,9 +1,7 @@
 package com.cinarli.kiosk;
 
-import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -12,45 +10,57 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class KioskHttpServer {
-    private static final int PORT = 8080;
-    private final MainActivity activity;
-    private final Handler mainHandler;
-    private ServerSocket serverSocket;
-    private boolean isRunning = false;
-    private final long startTime;
 
-    public KioskHttpServer(MainActivity activity) {
-        this.activity = activity;
-        this.mainHandler = new Handler(Looper.getMainLooper());
-        this.startTime = SystemClock.elapsedRealtime();
+    public interface CommandListener {
+        void onScreenOffCommand();
+        void onScreenOnCommand();
+        void onReloadCommand();
+        String onStatusRequest();
     }
 
-    public void start() {
-        if (isRunning) return;
-        isRunning = true;
+    private final int port;
+    private final CommandListener listener;
+    private final Handler mainHandler;
+    private ServerSocket serverSocket;
+    private volatile boolean running = false;
+
+    public KioskHttpServer(int port, CommandListener listener) {
+        this.port = port;
+        this.listener = listener;
+        this.mainHandler = new Handler(Looper.getMainLooper());
+    }
+
+    public synchronized void start() {
+        if (running) return;
+        running = true;
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    serverSocket = new ServerSocket(PORT);
-                    while (isRunning) {
-                        Socket socket = serverSocket.accept();
-                        handleClient(socket);
+                    serverSocket = new ServerSocket(port);
+                    while (running) {
+                        final Socket clientSocket = serverSocket.accept();
+                        handleClient(clientSocket);
                     }
-                } catch (Exception e) {
-                    // Sunucu kapandı veya hata
+                } catch (Exception ignored) {
+                } finally {
+                    running = false;
                 }
             }
         }).start();
     }
 
-    public void stop() {
-        isRunning = false;
+    public synchronized void stop() {
+        running = false;
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
         } catch (Exception ignored) {}
+    }
+
+    public boolean isRunning() {
+        return running && serverSocket != null && !serverSocket.isClosed();
     }
 
     private void handleClient(final Socket socket) {
@@ -69,33 +79,43 @@ public class KioskHttpServer {
                     String path = parts.length > 1 ? parts[1] : "/";
 
                     String responseJson = "{}";
+
                     if (path.startsWith("/kapat")) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                activity.turnScreenOff();
-                            }
-                        });
+                        if (listener != null) {
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    listener.onScreenOffCommand();
+                                }
+                            });
+                        }
                         responseJson = "{\"status\":\"ok\",\"action\":\"screen_off\"}";
                     } else if (path.startsWith("/ac")) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                activity.turnScreenOn();
-                            }
-                        });
+                        if (listener != null) {
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    listener.onScreenOnCommand();
+                                }
+                            });
+                        }
                         responseJson = "{\"status\":\"ok\",\"action\":\"screen_on\"}";
                     } else if (path.startsWith("/yenile")) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                activity.reloadWebView();
-                            }
-                        });
+                        if (listener != null) {
+                            mainHandler.post(new Runnable() {
+                                @Override
+                                public void run() {
+                                    listener.onReloadCommand();
+                                }
+                            });
+                        }
                         responseJson = "{\"status\":\"ok\",\"action\":\"reload\"}";
                     } else if (path.startsWith("/durum")) {
-                        long uptimeSec = (SystemClock.elapsedRealtime() - startTime) / 1000;
-                        responseJson = "{\"status\":\"online\",\"uptime_seconds\":" + uptimeSec + "}";
+                        if (listener != null) {
+                            responseJson = listener.onStatusRequest();
+                        } else {
+                            responseJson = "{\"status\":\"online\"}";
+                        }
                     } else {
                         responseJson = "{\"status\":\"error\",\"message\":\"Bilinmeyen komut\"}";
                     }
