@@ -7,11 +7,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 
 public class MainActivity extends Activity implements KioskHttpServer.CommandListener {
 
@@ -35,24 +37,37 @@ public class MainActivity extends Activity implements KioskHttpServer.CommandLis
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
-        blackOverlay = findViewById(R.id.blackOverlay);
+
+        // XML bagimliligini kaldirip siyah perdeyi dinamik olarak ekliyoruz
+        blackOverlay = new View(this);
+        blackOverlay.setBackgroundColor(Color.BLACK);
+        blackOverlay.setVisibility(View.GONE);
+        ViewGroup rootView = (ViewGroup) findViewById(android.R.id.content);
+        if (rootView != null) {
+            rootView.addView(blackOverlay, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+        }
 
         hideSystemUI();
 
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
+        if (webView != null) {
+            WebSettings settings = webView.getSettings();
+            settings.setJavaScriptEnabled(true);
+            settings.setDomStorageEnabled(true);
+            settings.setDatabaseEnabled(true);
 
-        webView.setWebViewClient(new WebViewClient() {
-            @SuppressWarnings("deprecation")
-            @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                super.onReceivedError(view, errorCode, description, failingUrl);
-            }
-        });
+            webView.setWebViewClient(new WebViewClient() {
+                @SuppressWarnings("deprecation")
+                @Override
+                public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                    super.onReceivedError(view, errorCode, description, failingUrl);
+                }
+            });
 
-        webView.loadUrl(DEFAULT_URL);
+            webView.loadUrl(DEFAULT_URL);
+        }
 
         PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
         if (powerManager != null) {
