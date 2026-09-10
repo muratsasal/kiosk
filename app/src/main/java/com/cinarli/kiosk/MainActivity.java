@@ -21,7 +21,7 @@ import android.widget.FrameLayout;
 public class MainActivity extends Activity implements KioskHttpServer.CommandListener {
 
     private static final int HTTP_PORT = 8080;
-    private static final String DEFAULT_URL = "https://kapinet.com.tr/gecis/kiosk.php?token=CinarliGecisKiosk2026";
+    private static final String DEFAULT_URL = "https://kapinet.com.tr/gecis/kiosk.php?token=CinarliGecis2026";
 
     private WebView webView;
     private View blackOverlay;
