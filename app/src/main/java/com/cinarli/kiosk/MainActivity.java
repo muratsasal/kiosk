@@ -3,6 +3,7 @@ package com.cinarli.kiosk;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.graphics.Color;
+import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -10,6 +11,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.SslErrorHandler;
+import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -38,7 +41,6 @@ public class MainActivity extends Activity implements KioskHttpServer.CommandLis
 
         webView = findViewById(R.id.webView);
 
-        // XML bagimliligini kaldirip siyah perdeyi dinamik olarak ekliyoruz
         blackOverlay = new View(this);
         blackOverlay.setBackgroundColor(Color.BLACK);
         blackOverlay.setVisibility(View.GONE);
@@ -57,8 +59,24 @@ public class MainActivity extends Activity implements KioskHttpServer.CommandLis
             settings.setJavaScriptEnabled(true);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            settings.setUseWideViewPort(true);
+            settings.setLoadWithOverviewMode(true);
 
+            // Eski Android'de SSL ve HTTP/HTTPS karma icerik engellerini kaldirma
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            }
+
+            webView.setWebChromeClient(new WebChromeClient());
             webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+                    // Eski tabletin modern SSL kok sertifikasina takilmasini engeller
+                    handler.proceed();
+                }
+
                 @SuppressWarnings("deprecation")
                 @Override
                 public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
